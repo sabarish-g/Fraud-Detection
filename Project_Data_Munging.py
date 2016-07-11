@@ -27,6 +27,10 @@ e.g. From, To, Timestamp, etc
 contentDict = {}
 cnt = 1
 
+'''TRY USING enumerate() instead of cnt+=1
+Looks stupid
+'''
+
 for filename in listoffiles:
     with open(filename, 'r') as files:
         content = []
@@ -59,6 +63,16 @@ for k,v in contentDict1.items():
     
 print contentDict1  
 
+'''To join the lists in the dictionaries'''
+cont = ' '.join(contentDict1['mail1'])
+print cont
+
+for k,v in contentDict1.items():
+        cont = ' '.join(contentDict1[k])
+        contentDict1[k] = cont
+
+print contentDict1
+        
 '''To delete a item inside a list in dict element'''
 del contentDict1['mail2'][contentDict1['mail2'].index('1,2,3,')]
 
@@ -69,7 +83,7 @@ del contentDict1['mail2'][contentDict1['mail2'].index('1,2,3,')]
 ###### Separating out the contents of each mail into a feature list
 '''
 ## Cleaner list
-cleanDict = dict()
+cleanDictOg = dict()
 
 ## To remove all the tabs and special characters
 for k,v in contentDict.items():
@@ -80,11 +94,13 @@ for k,v in contentDict.items():
         if temp1 != '':
             clean.append(temp1)
     
-    cleanDict[k] = clean
+    cleanDictOg[k] = clean
 
 #print clean
-print cleanDict[3]
+print cleanDictOg[3]
 
+cleanDict = cleanDictOg
+print cleanDict
 '''
 To get all the special features from the mailers - Timestamp, To, From, Subject in 
 separate lists
@@ -100,7 +116,7 @@ Timestamp raw will provide 'From whom it was' and 'Who sent it'
 timestampRaw = {}
 print timestampRaw
 
-regex = r"(From )"
+regex = r"(From |from:|From:)"
 
 for k,v in cleanDict.items():
     for val in cleanDict[k]:
@@ -128,14 +144,14 @@ The Return-path is the higher level sender, not the actual sender
 '''
 returnPath = {}
 #senderDict= dict()
-regex = r"(Return-Path: )"
-
+regex = r"(Return-Path:|Return-path|return-path)"
+reg = '[<>]'
 for k,v in cleanDict.items():
     for val in cleanDict[k]:
         if re.search(regex,val):
             temp = re.sub(regex, r'',val)
             #print "The content of ",k," is :::::::::::::", temp
-            returnPath[k] = temp.strip('<>')
+            returnPath[k] = re.sub(reg, r'',val)
             del cleanDict[k][cleanDict[k].index(val)]
             break
         else:
@@ -149,7 +165,7 @@ The recievers of the mails
 '''
 receiver = {}
 
-regex = r"^(To: )"
+regex = r"^(To:|to:)"
 for k,v in cleanDict.items():
     for val in cleanDict[k]:
         if re.search(regex,val):
@@ -168,7 +184,7 @@ print "The list of recievers is ", receiver
 The subject of the mails
 '''
 subject = {}
-regex = r"^(Subject: )"
+regex = r"^(Subject:|subject:)"
 for k,v in cleanDict.items():
     for val in cleanDict[k]:
         if re.search(regex,val):
@@ -185,7 +201,7 @@ print subject
 Timestamp of the mail
 '''
 timestamp = {}
-regex = r"^(Date: )"
+regex = r"^(Date:|date)"
 for k,v in cleanDict.items():
     for val in cleanDict[k]:
         if re.search(regex, val):
@@ -203,7 +219,7 @@ print timestamp
 Get the Message-ID
 '''
 messageID = {}
-regex = r"^(Message-ID: )"
+regex = r"^(Message-ID:|Message-Id:|Message-id|message-id)"
 for k,v in cleanDict.items():
     for val in cleanDict[k]:
         if re.search(regex, val):
@@ -221,7 +237,7 @@ print messageID
 Getting the content type and Content-transfer-encoding
 '''
 contentType = {}
-regex = r"^(Content-Type: )"
+regex = r"^(Content-Type:|content-type|Content-type)"
 for k,v in cleanDict.items():
     for val in cleanDict[k]:
         if re.search(regex, val):
@@ -250,11 +266,47 @@ for k,v in cleanDict.items():
         
 print contentEncoding
 
+print cleanDict
+
+'''
+GET THE CONTENT HERE
+To delete all the remaining tags, so that we can get only the content in the final file.
+Using Regex to remove the majority of the unnecessary tags, might be possible that all
+the words might not be removed, for that another round of pre-processing might be 
+required while creating the term document matrix
+'''
+contentForTermDoc = {}
+
+regex = r"""(Delivered|Received|Received:|POP|EMAP|ESMTP id|Sender:|Mime-Version|
+Mime-version|X-Priority|X-priority|IMAP|SMTPSVC|X-Authentication-Warning:|
+localhost|From:|MIME-Version:|X-Mailer:|X-Mimeole:|Thread-Index:|Content-Class:|
+X-Originalarrivaltime:)"""
+
+for k,v in cleanDict.items():
+    for val in cleanDict[k]:
+        if re.search(regex, val):
+            print "The content from ", k, ":::::",val
+            del cleanDict[k][cleanDict[k].index(val)]
+            
+        
+print contentEncoding
+
+print cleanDict
+
+'''Joining all the content in the list as one column
+The csv file is going to bulge
+'''
+for k,v in cleanDict.items():
+        cont = ' '.join(cleanDict[k])
+        cleanDict[k] = cont
+
+print cleanDict[1]
+
 '''
 Convert the lists into dataframes
 '''
 table = [timestamp, returnPath, receiver, subject, messageID,contentType, 
-         contentEncoding]
+         contentEncoding, cleanDict]
 print table
 
 dataframe = pd.DataFrame(table)
@@ -262,7 +314,7 @@ print dataframe
 ## Transpose the data 
 dataframe = dataframe.transpose()
 col = ['Timestamp', 'Sender', 'Reciever', 'Mail subject', 'MessageID', 
-       'Content Type', 'Content Encoding']
+       'Content Type', 'Content Encoding', 'Content']
 
 dataframe.columns = col
 dataframe['Spam'] = 'Yes'
